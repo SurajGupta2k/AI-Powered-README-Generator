@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Preview README</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-gradient-to-br from-gray-900 to-gray-800 min-h-screen text-white">
+    <div class="container mx-auto px-4 py-12 max-w-7xl">
+        <h1 class="text-4xl font-bold mb-8 bg-gradient-to-r from-blue-400 to-purple-500 text-transparent bg-clip-text">
+            Preview README for {{ repo_name }}
+        </h1>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div class="bg-gray-800/50 backdrop-blur-sm rounded-2xl p-6 shadow-xl">
+                <h3 class="text-2xl font-bold mb-4 text-purple-400">Edit Content</h3>
+                <form method="POST" action="/download" class="space-y-6">
+                    <textarea name="readme_content" 
+                              class="w-full h-[600px] px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 text-white font-mono text-sm">{{ readme_content }}</textarea>
+                    <input type="hidden" name="repo_name" value="{{ repo_name }}">
+                    <div class="flex gap-4">
+                        <button type="submit" 
+                                class="flex-1 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-50">
+                            Download README.md
+                        </button>
+                        <a href="/" 
+                           class="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-opacity-50 text-center">
+                            Generate New
+                        </a>
+                    </div>
+                </form>
+            </div>
+
+            <div class="bg-gray-800/50 backdrop-blur-sm rounded-2xl p-6 shadow-xl">
+                <h3 class="text-2xl font-bold mb-4 text-blue-400">Preview</h3>
+                <div id="preview" class="preview-content">
+                    <!-- Preview content will be inserted here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configure marked options
+        marked.setOptions({
+            breaks: true,
+            gfm: true
+        });
+
+        // Live Markdown preview
+        const textarea = document.querySelector('textarea');
+        const preview = document.getElementById('preview');
+        
+        function updatePreview() {
+            preview.innerHTML = marked.parse(textarea.value);
+        }
+        
+        textarea.addEventListener('input', updatePreview);
+        updatePreview();
+
+        // Add smooth scrolling sync between edit and preview
+        textarea.addEventListener('scroll', () => {
+            const percentage = textarea.scrollTop / (textarea.scrollHeight - textarea.clientHeight);
+            preview.scrollTop = percentage * (preview.scrollHeight - preview.clientHeight);
+        });
+    </script>
+</body>
+</html>
