@@ -7,6 +7,34 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link rel="stylesheet" href="style.css">
+    <style>
+        .button-container {
+            margin: 20px 0;
+            display: flex;
+            gap: 10px;
+        }
+        .button {
+            padding: 10px 20px;
+            background-color: #0366d6;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .button:hover {
+            background-color: #0255b3;
+        }
+        .home-button {
+            background-color: #28a745;
+        }
+        #preview-content {
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin: 20px 0;
+            white-space: pre-wrap;
+        }
+    </style>
 </head>
 <body class="bg-gradient-to-br from-gray-900 to-gray-800 min-h-screen text-white">
     <div class="container mx-auto px-4 py-12 max-w-7xl">
@@ -26,10 +54,11 @@
                                 class="flex-1 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-50">
                             Download README.md
                         </button>
-                        <a href="/" 
-                           class="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-opacity-50 text-center">
+                        <button type="button" 
+                                onclick="clearAndRedirect()"
+                                class="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-opacity-50 text-center">
                             Generate New
-                        </a>
+                        </button>
                     </div>
                 </form>
             </div>
@@ -66,6 +95,17 @@
             const percentage = textarea.scrollTop / (textarea.scrollHeight - textarea.clientHeight);
             preview.scrollTop = percentage * (preview.scrollHeight - preview.clientHeight);
         });
+
+        function clearAndRedirect() {
+            fetch('/clear', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            }).then(() => {
+                window.location.href = '/';
+            });
+        }
     </script>
 </body>
 </html>
