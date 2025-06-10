@@ -6,16 +6,54 @@
     <title>Preview README</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Add highlight.js for code syntax highlighting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
     <link rel="stylesheet" href="/static/style.css">
     <script>
-        // Check session expiration every minute
-        setInterval(() => {
-            const generatedAt = {{ session.get('generated_at', 0) }};
-            const now = Math.floor(Date.now() / 1000);
-            if (now - generatedAt > 300) { // 5 minutes
-                window.location.href = '/refresh';
+        // Configure marked options
+        document.addEventListener('DOMContentLoaded', function() {
+            marked.setOptions({
+                breaks: true,
+                gfm: true,
+                highlight: function(code, lang) {
+                    if (lang && hljs.getLanguage(lang)) {
+                        try {
+                            return hljs.highlight(lang, code).value;
+                        } catch (err) {
+                            console.log(err);
+                        }
+                    }
+                    return code;
+                }
+            });
+
+            // Initialize markdown preview
+            const textarea = document.querySelector('textarea');
+            const preview = document.getElementById('preview');
+            
+            function updatePreview() {
+                const markdown = textarea.value;
+                const html = marked.parse(markdown);
+                preview.innerHTML = html;
+                // Initialize syntax highlighting
+                preview.querySelectorAll('pre code').forEach((block) => {
+                    hljs.highlightBlock(block);
+                });
             }
-        }, 60000); // Check every minute
+            
+            textarea.addEventListener('input', updatePreview);
+            updatePreview(); // Initial render
+
+            // Check session expiration every minute
+            const generatedAt = parseInt("{{ session.get('generated_at', 0) }}");
+            setInterval(() => {
+                const now = Math.floor(Date.now() / 1000);
+                if (now - generatedAt > 300) { // 5 minutes
+                    window.location.href = '/refresh';
+                }
+            }, 60000);
+        });
 
         // Intercept refresh/back button
         window.onbeforeunload = function() {
@@ -28,31 +66,98 @@
         };
     </script>
     <style>
-        .button-container {
-            margin: 20px 0;
-            display: flex;
-            gap: 10px;
+        /* Preview content styles */
+        #preview {
+            color: #e5e7eb;
         }
-        .button {
-            padding: 10px 20px;
-            background-color: #0366d6;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
+
+        #preview h1,
+        #preview h2,
+        #preview h3,
+        #preview h4 {
+            color: #60a5fa;
+            margin-top: 1.5em;
+            margin-bottom: 0.5em;
+            font-weight: 600;
         }
-        .button:hover {
-            background-color: #0255b3;
+
+        #preview h1 { font-size: 2em; }
+        #preview h2 { font-size: 1.5em; }
+        #preview h3 { font-size: 1.25em; }
+
+        #preview p {
+            margin: 1em 0;
+            line-height: 1.6;
         }
-        .home-button {
-            background-color: #28a745;
+
+        #preview code {
+            background: rgba(45, 45, 45, 0.8);
+            padding: 0.2em 0.4em;
+            border-radius: 0.25em;
+            font-family: ui-monospace, monospace;
         }
-        #preview-content {
-            padding: 20px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            margin: 20px 0;
-            white-space: pre-wrap;
+
+        #preview pre {
+            background: rgba(45, 45, 45, 0.8);
+            padding: 1em;
+            border-radius: 0.5em;
+            overflow-x: auto;
+            margin: 1em 0;
+        }
+
+        #preview pre code {
+            background: transparent;
+            padding: 0;
+            border-radius: 0;
+        }
+
+        #preview ul,
+        #preview ol {
+            padding-left: 1.5em;
+            margin: 1em 0;
+        }
+
+        #preview li {
+            margin: 0.5em 0;
+        }
+
+        #preview blockquote {
+            border-left: 4px solid #4b5563;
+            margin: 1em 0;
+            padding-left: 1em;
+            color: #9ca3af;
+        }
+
+        #preview a {
+            color: #60a5fa;
+            text-decoration: none;
+        }
+
+        #preview a:hover {
+            text-decoration: underline;
+        }
+
+        #preview table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1em 0;
+        }
+
+        #preview th,
+        #preview td {
+            border: 1px solid #4b5563;
+            padding: 0.5em;
+        }
+
+        #preview th {
+            background: rgba(45, 45, 45, 0.8);
+        }
+
+        /* Textarea styles */
+        textarea {
+            font-family: ui-monospace, monospace;
+            line-height: 1.6;
+            tab-size: 4;
         }
     </style>
 </head>
@@ -90,7 +195,7 @@
 
             <div class="bg-gray-800/50 backdrop-blur-sm rounded-2xl p-6 shadow-xl">
                 <h3 class="text-2xl font-bold mb-4 text-blue-400">Preview</h3>
-                <div id="preview" class="preview-content">
+                <div id="preview" class="prose prose-invert max-w-none overflow-auto">
                     <!-- Preview content will be inserted here -->
                 </div>
             </div>
@@ -98,29 +203,6 @@
     </div>
 
     <script>
-        // Configure marked options
-        marked.setOptions({
-            breaks: true,
-            gfm: true
-        });
-
-        // Live Markdown preview
-        const textarea = document.querySelector('textarea');
-        const preview = document.getElementById('preview');
-        
-        function updatePreview() {
-            preview.innerHTML = marked.parse(textarea.value);
-        }
-        
-        textarea.addEventListener('input', updatePreview);
-        updatePreview();
-
-        // Add smooth scrolling sync between edit and preview
-        textarea.addEventListener('scroll', () => {
-            const percentage = textarea.scrollTop / (textarea.scrollHeight - textarea.clientHeight);
-            preview.scrollTop = percentage * (preview.scrollHeight - preview.clientHeight);
-        });
-
         function clearAndRedirect() {
             fetch('/clear', {
                 method: 'POST',
