@@ -1,4 +1,4 @@
-from flask import Response
+from flask import Response, send_from_directory
 from flask import Flask, render_template, request, jsonify, session
 from flask import render_template
 import requests
@@ -6,16 +6,37 @@ import json
 import os
 from datetime import datetime
 import google.generativeai as genai
+from functools import wraps
+import time
 
-app = Flask(__name__, template_folder='src')
+app = Flask(__name__, template_folder='src', static_folder='static')
 app.secret_key = os.urandom(24)  # Required for session management
 
 # Configure Gemini
 genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
 model = genai.GenerativeModel('gemini-1.5-pro-002')
 
+# Rate limiting configuration
+REQUESTS_PER_MINUTE = 60  # Adjust based on your quota
+request_timestamps = []
+
+def rate_limit():
+    now = time.time()
+    # Remove timestamps older than 1 minute
+    while request_timestamps and request_timestamps[0] < now - 60:
+        request_timestamps.pop(0)
+    if len(request_timestamps) >= REQUESTS_PER_MINUTE:
+        return True
+    request_timestamps.append(now)
+    return False
+
 def analyze_repo_with_gemini(repo_data, code_samples, package_json_content=None):
-    prompt = f"""
+    # Check rate limit
+    if rate_limit():
+        raise Exception("Rate limit exceeded. Please try again in a minute.")
+        
+    try:
+        prompt = f"""
 You are a highly experienced Technical Writer with over 10 years in the tech industry.  Your primary expertise lies in crafting clear, concise, and engaging README.md files for open-source projects.  You understand the importance of a well-structured README for attracting contributors, guiding users, and showcasing the value of a project.
 
 Your task is to analyze the provided GitHub repository data, code samples, and, if available, the contents of a `package.json` (or similar dependency file) and generate a professional-grade README.md file.  The README should be meticulously formatted in Markdown, incorporating appropriate headers, lists, code blocks, and relevant emojis to enhance readability and visual appeal.
@@ -73,8 +94,12 @@ Consider the following information about the repository:
 Your output should be the complete README.md content, ready to be saved directly to a file.  No introductory or concluding remarks are necessary.
 """
 
-    response = model.generate_content(prompt)
-    return response.text
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        if "429" in str(e):  # Rate limit error
+            raise Exception("API quota exceeded. Please try again later or upgrade your API plan.")
+        raise e
 
 def get_repo_data(repo_url):
     repo_url = repo_url.replace('.git', '')
@@ -157,6 +182,10 @@ def download():
         mimetype="text/markdown",
         headers={"Content-disposition": f"attachment; filename={filename}"}
     )
+
+@app.route('/static/<path:path>')
+def send_static(path):
+    return send_from_directory('static', path)
 
 if __name__ == '__main__':
     app.run(debug=True)
