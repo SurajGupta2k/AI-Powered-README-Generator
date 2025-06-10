@@ -12,9 +12,16 @@ import time
 app = Flask(__name__, template_folder='src', static_folder='static')
 app.secret_key = os.urandom(24)  # Required for session management
 
+# Verify API key
+api_key = os.getenv('GEMINI_API_KEY')
+if not api_key:
+    raise ValueError("GEMINI_API_KEY environment variable is not set")
+print(f"API Key verification: {'✓ Key is set' if api_key else '✗ Key is missing'}")
+print(f"API Key starts with: {api_key[:12]}...")  # Only show first 12 chars for security
+
 # Configure Gemini
-genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
-model = genai.GenerativeModel('gemini-1.5-pro-002')
+genai.configure(api_key=api_key)
+model = genai.GenerativeModel('gemini-2.0-flash')
 
 # Rate limiting configuration
 REQUESTS_PER_MINUTE = 60  # Adjust based on your quota
