@@ -4,13 +4,15 @@ from flask import render_template
 import requests
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 import google.generativeai as genai
 from functools import wraps
 import time
 
 app = Flask(__name__, template_folder='src', static_folder='static')
 app.secret_key = os.urandom(24)  # Required for session management
+# Set session lifetime to 5 minutes
+app.permanent_session_lifetime = timedelta(minutes=5)
 
 # Verify API key
 api_key = os.getenv('GEMINI_API_KEY')
@@ -177,9 +179,11 @@ def index():
             # Generate README with Gemini
             readme_content = analyze_repo_with_gemini(repo_data, code_samples)
             
-            # Store in session
+            # Store in session with timestamp
+            session.permanent = True
             session['readme_content'] = readme_content
-            session['repo_name'] = repo_data.get('name', 'unnamed-repo')  # Provide default value
+            session['repo_name'] = repo_data.get('name', 'unnamed-repo')
+            session['generated_at'] = datetime.now().timestamp()
             
             return render_template('preview.html', 
                                  readme_content=readme_content,
@@ -191,8 +195,14 @@ def index():
             return render_template('index.html', 
                                 error="An unexpected error occurred. Please try again later.")
     
-    # Check if there's stored content in session when accessing via GET
-    if 'readme_content' in session and 'repo_name' in session:
+    # For GET requests, check if session data is still valid
+    if 'readme_content' in session and 'repo_name' in session and 'generated_at' in session:
+        # Check if the session is older than 5 minutes
+        generated_at = session.get('generated_at', 0)
+        if datetime.now().timestamp() - generated_at > 300:  # 300 seconds = 5 minutes
+            session.clear()
+            return render_template('index.html')
+        
         return render_template('preview.html',
                              readme_content=session['readme_content'],
                              repo_name=session['repo_name'])
@@ -219,6 +229,12 @@ def download():
 @app.route('/static/<path:path>')
 def send_static(path):
     return send_from_directory('static', path)
+
+# Add a new route to handle manual refresh/clear
+@app.route('/refresh', methods=['GET'])
+def refresh():
+    session.clear()
+    return render_template('index.html')
 
 if __name__ == '__main__':
     app.run(debug=True)

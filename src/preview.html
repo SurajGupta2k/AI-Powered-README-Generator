@@ -7,6 +7,26 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link rel="stylesheet" href="/static/style.css">
+    <script>
+        // Check session expiration every minute
+        setInterval(() => {
+            const generatedAt = {{ session.get('generated_at', 0) }};
+            const now = Math.floor(Date.now() / 1000);
+            if (now - generatedAt > 300) { // 5 minutes
+                window.location.href = '/refresh';
+            }
+        }, 60000); // Check every minute
+
+        // Intercept refresh/back button
+        window.onbeforeunload = function() {
+            fetch('/clear', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+        };
+    </script>
     <style>
         .button-container {
             margin: 20px 0;
@@ -38,9 +58,14 @@
 </head>
 <body class="bg-gradient-to-br from-gray-900 to-gray-800 min-h-screen text-white">
     <div class="container mx-auto px-4 py-12 max-w-7xl">
-        <h1 class="text-4xl font-bold mb-8 bg-gradient-to-r from-blue-400 to-purple-500 text-transparent bg-clip-text">
-            Preview README for {{ repo_name }}
-        </h1>
+        <div class="flex justify-between items-center mb-8">
+            <h1 class="text-4xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 text-transparent bg-clip-text">
+                Preview README for {{ repo_name }}
+            </h1>
+            <a href="/refresh" class="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold py-2 px-4 rounded-lg transition-all duration-300">
+                Generate New README
+            </a>
+        </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div class="bg-gray-800/50 backdrop-blur-sm rounded-2xl p-6 shadow-xl">
