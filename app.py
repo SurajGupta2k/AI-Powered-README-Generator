@@ -109,61 +109,87 @@ Your output should be the complete README.md content, ready to be saved directly
         raise e
 
 def get_repo_data(repo_url):
-    repo_url = repo_url.replace('.git', '')
-    parts = [p for p in repo_url.split('/') if p]
-    owner, repo = parts[-2], parts[-1]
-    
-    # Get basic repo info
-    api_url = f"https://api.github.com/repos/{owner}/{repo}"
-    headers = {}
-    if os.getenv('GITHUB_TOKEN'):
-        headers['Authorization'] = f"token {os.getenv('GITHUB_TOKEN')}"
-    
-    repo_response = requests.get(api_url, headers=headers)
-    repo_data = repo_response.json()
-    
-    # Get code samples
-    contents_url = f"https://api.github.com/repos/{owner}/{repo}/contents/"
-    contents_response = requests.get(contents_url, headers=headers)
-    contents = contents_response.json()
-    
-    code_samples = []
-    # Ensure contents is a list and limit to first 5 files
-    if isinstance(contents, list):
-        file_count = 0
-        for item in contents:
-            if file_count >= 5:  # Limit to 5 files
-                break
-            if item['type'] == 'file':
-                try:
-                    file_response = requests.get(item['download_url'], headers=headers)
-                    code_samples.append({
-                        'filename': item['name'],
-                        'content': file_response.text[:1000]  # First 1000 chars
-                    })
-                    file_count += 1
-                except Exception as e:
-                    print(f"Error fetching file {item['name']}: {str(e)}")
-                    continue
-    
-    return repo_data, code_samples
+    try:
+        repo_url = repo_url.replace('.git', '')
+        parts = [p for p in repo_url.split('/') if p]
+        owner, repo = parts[-2], parts[-1]
+        
+        # Get basic repo info
+        api_url = f"https://api.github.com/repos/{owner}/{repo}"
+        headers = {}
+        if os.getenv('GITHUB_TOKEN'):
+            headers['Authorization'] = f"token {os.getenv('GITHUB_TOKEN')}"
+        
+        repo_response = requests.get(api_url, headers=headers)
+        repo_response.raise_for_status()  # Raise exception for bad status codes
+        repo_data = repo_response.json()
+        
+        if 'name' not in repo_data:
+            raise ValueError("Invalid repository data received from GitHub API")
+        
+        # Get code samples
+        contents_url = f"https://api.github.com/repos/{owner}/{repo}/contents/"
+        contents_response = requests.get(contents_url, headers=headers)
+        contents_response.raise_for_status()
+        contents = contents_response.json()
+        
+        code_samples = []
+        # Ensure contents is a list and limit to first 5 files
+        if isinstance(contents, list):
+            file_count = 0
+            for item in contents:
+                if file_count >= 5:  # Limit to 5 files
+                    break
+                if item['type'] == 'file':
+                    try:
+                        file_response = requests.get(item['download_url'], headers=headers)
+                        file_response.raise_for_status()
+                        code_samples.append({
+                            'filename': item['name'],
+                            'content': file_response.text[:1000]  # First 1000 chars
+                        })
+                        file_count += 1
+                    except Exception as e:
+                        print(f"Error fetching file {item['name']}: {str(e)}")
+                        continue
+        
+        return repo_data, code_samples
+    except requests.exceptions.RequestException as e:
+        print(f"GitHub API error: {str(e)}")
+        raise ValueError("Failed to fetch repository data. Please check the URL and try again.")
+    except (KeyError, IndexError) as e:
+        print(f"Error parsing repository URL: {str(e)}")
+        raise ValueError("Invalid repository URL format. Please use the format: https://github.com/username/repository")
+    except Exception as e:
+        print(f"Unexpected error: {str(e)}")
+        raise ValueError("An unexpected error occurred while fetching repository data.")
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
-        repo_url = request.form.get('repo_url')
-        repo_data, code_samples = get_repo_data(repo_url)
-        
-        # Generate README with Gemini
-        readme_content = analyze_repo_with_gemini(repo_data, code_samples)
-        
-        # Store in session
-        session['readme_content'] = readme_content
-        session['repo_name'] = repo_data['name']
-        
-        return render_template('preview.html', 
-                             readme_content=readme_content,
-                             repo_name=repo_data['name'])
+        try:
+            repo_url = request.form.get('repo_url')
+            if not repo_url:
+                return render_template('index.html', error="Please enter a repository URL")
+            
+            repo_data, code_samples = get_repo_data(repo_url)
+            
+            # Generate README with Gemini
+            readme_content = analyze_repo_with_gemini(repo_data, code_samples)
+            
+            # Store in session
+            session['readme_content'] = readme_content
+            session['repo_name'] = repo_data.get('name', 'unnamed-repo')  # Provide default value
+            
+            return render_template('preview.html', 
+                                 readme_content=readme_content,
+                                 repo_name=repo_data.get('name', 'unnamed-repo'))
+        except ValueError as e:
+            return render_template('index.html', error=str(e))
+        except Exception as e:
+            app.logger.error(f"An error occurred: {str(e)}")
+            return render_template('index.html', 
+                                error="An unexpected error occurred. Please try again later.")
     
     # Check if there's stored content in session when accessing via GET
     if 'readme_content' in session and 'repo_name' in session:
