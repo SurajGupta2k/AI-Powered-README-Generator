@@ -118,18 +118,44 @@ def get_repo_data(repo_url):
         
         # Get basic repo info
         api_url = f"https://api.github.com/repos/{owner}/{repo}"
-        headers = {}
-        if os.getenv('GITHUB_TOKEN'):
-            headers['Authorization'] = f"token {os.getenv('GITHUB_TOKEN')}"
+        headers = {
+            'Accept': 'application/vnd.github.v3+json'
+        }
         
+        github_token = os.getenv('GITHUB_TOKEN')
+        if github_token:
+            headers['Authorization'] = f"Bearer {github_token}"
+        else:
+            print("Warning: No GitHub token found. Rate limits will be restricted.")
+        
+        # Make the API request
         repo_response = requests.get(api_url, headers=headers)
-        repo_response.raise_for_status()  # Raise exception for bad status codes
+        
+        # Check for rate limit
+        remaining = repo_response.headers.get('X-RateLimit-Remaining', 'N/A')
+        reset_time = repo_response.headers.get('X-RateLimit-Reset', 'N/A')
+        if remaining != 'N/A':
+            print(f"GitHub API calls remaining: {remaining}")
+        
+        if repo_response.status_code == 403 and 'rate limit exceeded' in repo_response.text.lower():
+            if reset_time != 'N/A':
+                reset_datetime = datetime.fromtimestamp(int(reset_time))
+                reset_in = reset_datetime - datetime.now()
+                minutes = reset_in.total_seconds() / 60
+                raise ValueError(
+                    f"GitHub API rate limit exceeded. Rate limit will reset in {int(minutes)} minutes. "
+                    "Please try again later or add a GitHub token to increase limits."
+                )
+            else:
+                raise ValueError("GitHub API rate limit exceeded. Please try again later.")
+        
+        repo_response.raise_for_status()
         repo_data = repo_response.json()
         
         if 'name' not in repo_data:
             raise ValueError("Invalid repository data received from GitHub API")
         
-        # Get code samples
+        # Get code samples with the same headers
         contents_url = f"https://api.github.com/repos/{owner}/{repo}/contents/"
         contents_response = requests.get(contents_url, headers=headers)
         contents_response.raise_for_status()
@@ -157,6 +183,10 @@ def get_repo_data(repo_url):
         
         return repo_data, code_samples
     except requests.exceptions.RequestException as e:
+        if '403' in str(e) and 'rate limit exceeded' in str(e).lower():
+            raise ValueError(
+                "GitHub API rate limit exceeded. Please try again later or add a GitHub token to increase limits."
+            )
         print(f"GitHub API error: {str(e)}")
         raise ValueError("Failed to fetch repository data. Please check the URL and try again.")
     except (KeyError, IndexError) as e:
